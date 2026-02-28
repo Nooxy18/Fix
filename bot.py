@@ -3,12 +3,13 @@ from email.message import EmailMessage
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import asyncio
 
 # ENV
 TOKEN = os.environ.get("TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
-# Folder logs, aman di Railway
+# Folder logs
 log_path = "./logs"
 try:
     os.makedirs(log_path)
@@ -25,7 +26,7 @@ def log(msg):
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
     except Exception:
-        pass  # aman kalau permission terbatas
+        pass
 
 # Load config
 try:
@@ -38,7 +39,7 @@ TARGETS = config.get("targets", [])
 senders = config.get("senders", {})
 premium_users = set(config.get("premium_users", []))
 
-# Popup Telegram rapi
+# Popup Telegram
 async def send_email_popup(update, sender, target, subject, body, status, progress):
     msg = (
         f"🟢 SEND EMAIL REPORT\n\n"
@@ -52,12 +53,11 @@ async def send_email_popup(update, sender, target, subject, body, status, progre
     )
     await update.message.reply_text(msg)
 
-# Command /send
+# /send
 async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args)<2:
         await update.message.reply_text("Usage: /send <from_email> <subject> <body>")
         return
-
     sender = context.args[0]
     subject = context.args[1]
     body = " ".join(context.args[2:])
@@ -66,7 +66,6 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target is None:
         await update.message.reply_text("❌ No locked targets configured.")
         return
-
     if sender not in senders:
         await update.message.reply_text("❌ Sender not found. Use /addsender first.")
         return
@@ -77,7 +76,6 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         m["To"] = target
         m["Subject"] = subject
         m.set_content(body)
-
         smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         smtp.login(sender, senders[sender])
         smtp.send_message(m)
@@ -89,7 +87,7 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await send_email_popup(update, sender, target, subject, body, success, "1/1")
 
-# Command /addsender
+# /addsender
 async def add_sender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args)!=2:
         await update.message.reply_text("Use /addsender <email> <app_password>")
@@ -105,7 +103,7 @@ async def add_sender(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     await update.message.reply_text(f"✅ Sender {email_addr} added")
 
-# Command /listsenders
+# /listsenders
 async def list_senders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not senders:
         await update.message.reply_text("No senders yet.")
@@ -113,15 +111,14 @@ async def list_senders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "\n".join(senders.keys())
     await update.message.reply_text("📧 Senders:\n"+text)
 
-# Command /botstatus
+# /botstatus
 async def bot_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📊 Status\nSenders: {len(senders)}\nTargets: {len(TARGETS)}\nPremium: {len(premium_users)}"
     )
 
-# IMAP reply checker
+# Background IMAP reply checker
 async def check_replies():
-    import asyncio
     while True:
         for email_addr, app_pass in senders.items():
             try:
@@ -150,18 +147,17 @@ async def check_replies():
 
 # MAIN
 def main():
-    import asyncio
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("send", send_command))
     app.add_handler(CommandHandler("addsender", add_sender))
     app.add_handler(CommandHandler("listsenders", list_senders))
     app.add_handler(CommandHandler("botstatus", bot_status))
 
-    # Jalankan IMAP reply checker setelah loop jalan
-    async def startup(app):
-        asyncio.create_task(check_replies())
+    # Background task
+    loop = asyncio.get_event_loop()
+    loop.create_task(check_replies())
 
-    app.run_polling(poll_interval=1, timeout=30, stop_signals=None, on_startup=[startup])
+    app.run_polling(poll_interval=1, timeout=30, stop_signals=None)
 
 if __name__=="__main__":
     main()
