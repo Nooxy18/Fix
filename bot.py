@@ -8,8 +8,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 TOKEN = os.environ.get("TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID","0"))
 
-LOG_FILE = "./logs/bot.log"
-os.makedirs("./logs", exist_ok=True)
+log_path = "./logs"
+if not os.path.isdir(log_path):
+    os.makedirs(log_path, exist_ok=True)
 
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
