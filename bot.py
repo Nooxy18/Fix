@@ -39,7 +39,7 @@ TARGETS = config.get("targets", [])
 senders = config.get("senders", {})
 premium_users = set(config.get("premium_users", []))
 
-# Popup Telegram
+# Telegram popup
 async def send_email_popup(update, sender, target, subject, body, status, progress):
     msg = (
         f"🟢 SEND EMAIL REPORT\n\n"
@@ -153,9 +153,8 @@ def main():
     app.add_handler(CommandHandler("listsenders", list_senders))
     app.add_handler(CommandHandler("botstatus", bot_status))
 
-    # Background task
-    loop = asyncio.get_event_loop()
-    loop.create_task(check_replies())
+    # Background task 3.13-ready
+    asyncio.create_task(check_replies())
 
     app.run_polling(poll_interval=1, timeout=30, stop_signals=None)
 
